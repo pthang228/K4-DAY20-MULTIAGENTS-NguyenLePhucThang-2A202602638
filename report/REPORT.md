@@ -4,7 +4,7 @@
 
 | Họ tên | Mã sinh viên | Phần đóng góp |
 |---|---|---|
-| Chưa cung cấp | Chưa cung cấp | Hoàn thiện harness, thiết kế và chạy thí nghiệm, phân tích kết quả |
+| Nguyễn Lê Phúc Thắng | 2A202602638 | Hoàn thiện harness, thiết kế và chạy thí nghiệm, phân tích kết quả |
 
 - Mô hình chính thức: `deepseek:deepseek-reasoner`; `LAB_TEMPERATURE=0`. `recursion_limit=60`, riêng các lượt dữ liệu phải chạy lại sau lỗi đệ quy dùng 80 (`skills-auto/data-learn`, `subagents/data-eval`, `skills-auto/data-eval`). Các `run.json` chính thức đều không còn `error`.
 - Deep Agents `0.7.21`, Python 3.12, Windows, chạy trực tiếp. Backend dùng môi trường tối thiểu, tắt pytest plugin tự nạp và chỉ chuyển các biến hệ thống Windows không chứa bí mật.
