@@ -6,10 +6,17 @@ Chạy thật:   python -m lab.runner --condition baseline --tasks learn
 """
 import argparse
 import json
+import re
+import shutil
+import tempfile
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
+from langchain_core.callbacks import UsageMetadataCallbackHandler
 from langchain_core.messages import AIMessage, ToolMessage
 
+from .agent import build_agent
 from .grading import grade                                                      # có sẵn
 from .tasks import ROOT, get_task, hash_dir, list_tasks, prepare_sandbox         # có sẵn
 
@@ -65,7 +72,101 @@ def run_task(task_id: str, condition: str, results_dir="results", model=None, re
     Lỗi khi chạy tác tử KHÔNG được làm chương trình dừng: ghi vào `error` và vẫn chấm điểm.
     Sandbox là thư mục tạm NGOÀI kho mã nguồn và phải được xóa sau khi chạy.
     """
-    raise NotImplementedError("TODO 1: cài đặt run_task (xem guides/pseudocode/03_runner.md)")
+    cfg = CONDITIONS[condition]
+    task = get_task(task_id)
+    skills_dir = ROOT / cfg["skills_dir"] if cfg["skills_dir"] else None
+    out_dir = Path(results_dir) / condition / task_id
+    out_dir.mkdir(parents=True, exist_ok=True)
+    sandbox = Path(tempfile.mkdtemp(prefix=f"lab-{task_id}-"))
+
+    record = {
+        "task": task.id,
+        "condition": condition,
+        "role": task.role,
+        "error": None,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    messages = []
+    final_message = ""
+    usage = UsageMetadataCallbackHandler()
+    started = time.perf_counter()
+    skills_before = hash_dir(sandbox / "skills")
+
+    try:
+        prepare_sandbox(task, sandbox, skills_dir)
+        skills_before = hash_dir(sandbox / "skills")
+        record["skills_sha256"] = skills_before
+
+        try:
+            agent = build_agent(
+                sandbox,
+                mode=cfg["mode"],
+                use_skills=skills_dir is not None,
+                model=model,
+            )
+            result = agent.invoke(
+                {"messages": [{"role": "user", "content": task.instruction}]},
+                config={"callbacks": [usage], "recursion_limit": recursion_limit},
+            )
+            messages = result.get("messages", [])
+            if messages:
+                final_message = str(messages[-1].content)
+        except Exception as exc:  # noqa: BLE001 - a run failure is experimental data
+            record["error"] = f"{type(exc).__name__}: {exc}"
+
+        calls = [
+            call
+            for message in messages
+            if isinstance(message, AIMessage)
+            for call in message.tool_calls
+        ]
+        skill_names = set()
+        for call in calls:
+            if call.get("name") != "read_file":
+                continue
+            file_path = str(call.get("args", {}).get("file_path", "")).replace("\\", "/")
+            match = re.search(r"(?:^|/)skills/([^/]+)(?:/|$)", file_path)
+            if match:
+                skill_names.add(match.group(1))
+
+        token_values = usage.usage_metadata.values()
+        record.update({
+            "seconds": round(time.perf_counter() - started, 1),
+            "tokens": {
+                "input": sum(int(value.get("input_tokens", 0)) for value in token_values),
+                "output": sum(int(value.get("output_tokens", 0)) for value in usage.usage_metadata.values()),
+                "total": sum(int(value.get("total_tokens", 0)) for value in usage.usage_metadata.values()),
+            },
+            "tool_calls": len(calls),
+            "subagent_calls": sum(call.get("name") == "task" for call in calls),
+            "skills_read": len(skill_names),
+            "skills_modified": hash_dir(sandbox / "skills") != skills_before,
+            "skills_sha256": skills_before,
+            "final_message": final_message,
+        })
+
+        record.update(grade(task, sandbox / "workspace"))
+        (out_dir / "trace.md").write_text(render_trace(messages), encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001 - always persist an auditable run record
+        record["error"] = f"{type(exc).__name__}: {exc}"
+        record.setdefault("seconds", round(time.perf_counter() - started, 1))
+        record.setdefault("tokens", {"input": 0, "output": 0, "total": 0})
+        record.setdefault("tool_calls", 0)
+        record.setdefault("subagent_calls", 0)
+        record.setdefault("skills_read", 0)
+        record.setdefault("skills_modified", hash_dir(sandbox / "skills") != skills_before)
+        record.setdefault("skills_sha256", skills_before)
+        record.setdefault("final_message", final_message)
+        record.update(grade(task, sandbox / "workspace"))
+        (out_dir / "trace.md").write_text(render_trace(messages), encoding="utf-8")
+    finally:
+        shutil.rmtree(sandbox, ignore_errors=True)
+
+    (out_dir / "run.json").write_text(
+        json.dumps(record, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return record
 
 
 def main(argv=None):
