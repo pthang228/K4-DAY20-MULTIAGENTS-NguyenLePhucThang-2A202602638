@@ -60,7 +60,7 @@ def make_backend(sandbox: Path):
         # Git for Windows supplies the Unix-like commands used by the lab tasks.
         # These paths are harmless when Git is not installed.
         path_entries.extend([
-            str(Path(sys.executable).resolve().parents[2] / "native" / "git" / "usr" / "bin"),
+            str(Path(sys.executable).resolve().parents[1] / "native" / "git" / "usr" / "bin"),
             r"C:\Program Files\Git\usr\bin",
             r"C:\Windows\System32",
             r"C:\Windows",
@@ -72,7 +72,24 @@ def make_backend(sandbox: Path):
         "PATH": os.pathsep.join(path_entries),
         "HOME": str(sandbox),
         "PYTHONDONTWRITEBYTECODE": "1",
+        # The lab workspaces do not rely on third-party pytest plugins.  Turning
+        # off global auto-loading keeps their tests isolated from packages in
+        # the harness environment.
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
     }
+    if os.name == "nt":
+        # CPython's socket/asyncio modules need the Windows system directory to
+        # initialise Winsock.  Copy only this small allow-list of non-secret OS
+        # settings; provider credentials and the rest of the parent environment
+        # remain unavailable to the agent shell.
+        env.update({
+            "SYSTEMROOT": os.environ.get("SYSTEMROOT", r"C:\Windows"),
+            "WINDIR": os.environ.get("WINDIR", r"C:\Windows"),
+            "COMSPEC": os.environ.get("COMSPEC", r"C:\Windows\System32\cmd.exe"),
+            "TEMP": str(sandbox),
+            "TMP": str(sandbox),
+            "PATHEXT": ".COM;.EXE;.BAT;.CMD",
+        })
     return LocalShellBackend(
         root_dir=sandbox,
         virtual_mode=True,

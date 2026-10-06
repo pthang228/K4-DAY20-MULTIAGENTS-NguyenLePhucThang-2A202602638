@@ -27,6 +27,14 @@ CONDITIONS = {
     "skills-auto": {"mode": "single", "skills_dir": "skills/auto"},
 }
 
+RUN_BOUNDARY_NOTE = (
+    "\n\nExecution boundary: inspect and modify only relative paths under workspace/ and, when present, "
+    "read skill instructions only under skills/. Never inspect parent, home, temporary, repository, or other "
+    "absolute paths, and never search for hidden checks, evaluator code, or undisclosed conventions. "
+    "Do not repeat a command whose result is already sufficient. Once the requested outputs are complete, "
+    "validate them once and stop."
+)
+
 
 def render_trace(messages) -> str:
     """CÓ SẴN, KHÔNG SỬA. Chuyển danh sách message của luồng chính thành Markdown (vết - trace).
@@ -104,11 +112,17 @@ def run_task(task_id: str, condition: str, results_dir="results", model=None, re
                 use_skills=skills_dir is not None,
                 model=model,
             )
-            result = agent.invoke(
-                {"messages": [{"role": "user", "content": task.instruction}]},
+            # Keep the most recent graph state while streaming.  If the model
+            # hits the recursion limit, the partial trace remains available for
+            # diagnosing the loop instead of being discarded by ``invoke``.
+            last_state = {}
+            for state in agent.stream(
+                {"messages": [{"role": "user", "content": task.instruction + RUN_BOUNDARY_NOTE}]},
                 config={"callbacks": [usage], "recursion_limit": recursion_limit},
-            )
-            messages = result.get("messages", [])
+                stream_mode="values",
+            ):
+                last_state = state
+                messages = last_state.get("messages", messages)
             if messages:
                 final_message = str(messages[-1].content)
         except Exception as exc:  # noqa: BLE001 - a run failure is experimental data
