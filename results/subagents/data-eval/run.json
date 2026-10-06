@@ -1,0 +1,69 @@
+{
+  "task": "data-eval",
+  "condition": "subagents",
+  "role": "eval",
+  "error": null,
+  "timestamp": "2026-10-06T05:45:56.238406+00:00",
+  "skills_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "seconds": 38.0,
+  "tokens": {
+    "input": 149476,
+    "output": 6710,
+    "total": 156186
+  },
+  "tool_calls": 21,
+  "subagent_calls": 0,
+  "skills_read": 0,
+  "skills_modified": false,
+  "final_message": "Done. `workspace/answer.json` is written and validated.\n\n**Cleaning steps**\n1. **Deduplicated events** — 88 raw events collapse to 83 distinct `id`s; 5 repeated events were dropped keeping the first occurrence (`A-2006`, `A-2011`, `A-2026`, `A-2047`, `A-2058`).\n2. **Normalised totals** — numeric values kept, string values like `\"1,346.73\"` had commas stripped and were parsed with `Decimal` for exact arithmetic; `-1` was treated as *missing* and excluded from revenue (7 such orders).\n3. **Normalised categories** — trimmed surrounding spaces and lowercased (`\" garden \"`, `\"TOYS\"`, `\"Music\"` → `garden`, `toys`, `music`).\n4. **Month attribution in UTC** — each `placed_at` was converted from its offset to UTC before deciding the month. This correctly moved `A-3001` (`2024-04-01T01:00+07:00`), `A-3000` (`2024-02-29T20:00-05:00`), `A-2074`/`A-2077`/`A-2010` (+07:00) into or out of March, and excluded `A-3002` (`2024-03-31T22:30-05:00` → 1 Apr UTC).\n\n**Results:** `march_revenue_utc` 52957.19 over 44 orders, `top_category` \"toys\" (29876.24), `missing_total_orders` 7, `duplicate_events_removed` 5.\n\nNote: `workspace/` contains only `README.md` and `orders.json`, and there is no `skills/` folder — the README documents fields but defines no extra reporting-convention keys, so I emitted exactly the five requested keys.",
+  "score": 0.5555555555555556,
+  "passed": 5,
+  "total": 9,
+  "checks": [
+    {
+      "name": "march_revenue_utc",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "march_orders_utc",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "top_category",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "missing_total_orders",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "duplicate_events_removed",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "rule_money_in_cents",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "name": "rule_meta_block",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "name": "rule_clean_csv",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "name": "rule_sorted_keys_format",
+      "passed": false,
+      "detail": ""
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "task": "data-learn",
+  "condition": "skills-auto",
+  "role": "learn",
+  "error": null,
+  "timestamp": "2026-10-06T05:48:22.456776+00:00",
+  "skills_sha256": "65fa63c1c1e7f1356fd74d02d6c206d752489dd418f1f38fbe05ae0186350263",
+  "seconds": 48.6,
+  "tokens": {
+    "input": 129126,
+    "output": 9253,
+    "total": 138379
+  },
+  "tool_calls": 20,
+  "subagent_calls": 0,
+  "skills_read": 3,
+  "skills_modified": false,
+  "final_message": "Done. Deliverable: `workspace/answer.json`.\n\n**Cleaning steps applied**\n- **Duplicates**: collapsed re-exported rows to one row per `order_id` (keeping the first occurrence); all duplicate groups had identical payloads (no conflicts), so 7 duplicate rows were removed (101 raw rows → 94 distinct orders).\n- **Date parsing**: handled all three formats — `YYYY-MM-DD` and `DD/MM/YYYY` treated as 00:00 UTC, and ISO-8601 timestamps with offsets (including `Z`) normalized to UTC before the Q1 window test (2024-01-01 00:00:00 UTC ≤ t ≤ 2024-03-31 23:59:59 UTC). Offsets matter: `S-2003` (2023-12-31T21:00-05:00) is inside Q1, while `S-2000` (2024-03-31T22:30-05:00) falls outside.\n- **Region normalization**: trimmed surrounding spaces and applied case-insensitive mapping to North/South/East/West.\n- **Missing amounts**: rows with `-999` were treated as unknown — excluded from every revenue total and from region ranking, but still counted as distinct orders with missing amount.\n- **Verification**: read the JSON back and asserted key set, value types (float for revenue, ints for the counts, string region), allowed region values, and the computed values.\n\n**Result**\n| key | value |\n|---|---|\n| north_q1_revenue | 3130.24 |\n| north_q1_orders | 10 |\n| top_region | North |\n| missing_amount_orders | 8 |\n| duplicate_rows_removed | 7 |\n\nRegion totals over the whole file (excluding missing amounts): North 9504.47, South 9136.24, East 8790.82, West 8475.68 — so North is the top region. Created files: `workspace/answer.json` only (the temporary helper script was removed).",
+  "score": 0.625,
+  "passed": 5,
+  "total": 8,
+  "checks": [
+    {
+      "name": "north_q1_revenue",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "north_q1_orders",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "top_region",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "missing_amount_orders",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "duplicate_rows_removed",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "rule_money_in_cents",
+      "passed": false,
+      "detail": "RULE: money values in answer.json are integer cents (1606.67 USD is written 160667)."
+    },
+    {
+      "name": "rule_meta_block",
+      "passed": false,
+      "detail": "RULE: answer.json has an object `meta` = {\"source\": <input file name>, \"rows_in\": <number of data rows in the input file, duplicates included>, \"rows_used\": <number of distinct orders with a known amount>}."
+    },
+    {
+      "name": "rule_clean_csv",
+      "passed": false,
+      "detail": "RULE: write workspace/clean.csv with the header order_id,timestamp_utc,region,amount_cents; one row per distinct order with a known amount; timestamp_utc as YYYY-MM-DDTHH:MM:SSZ (UTC); region in canonical spelling (North, South, East, West); amount in integer cents."
+    }
+  ]
+}
